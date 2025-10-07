@@ -18,7 +18,7 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
     0.1,
     1000
   );
-  camera.position.set(0, 1.5, 4);
+  camera.position.set(0, 1, 4);
 
   // Renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -151,17 +151,21 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
     // Build geometries for left "T" and right "RUS"
     const geomT = new TextGeometry('T', textOptions);
     geomT.computeBoundingBox();
+    let heightT = 0;
     if (geomT.boundingBox) {
       const xExtent = geomT.boundingBox.max.x - geomT.boundingBox.min.x;
       const yExtent = geomT.boundingBox.max.y - geomT.boundingBox.min.y;
+      heightT = yExtent;
       geomT.translate(-xExtent * 0.5, -yExtent * 0.5, 0);
     }
 
     const geomRUS = new TextGeometry('RUS', textOptions);
     geomRUS.computeBoundingBox();
+    let heightRUS = 0;
     if (geomRUS.boundingBox) {
       const xExtent = geomRUS.boundingBox.max.x - geomRUS.boundingBox.min.x;
       const yExtent = geomRUS.boundingBox.max.y - geomRUS.boundingBox.min.y;
+      heightRUS = yExtent;
       geomRUS.translate(-xExtent * 0.5, -yExtent * 0.5, 0);
     }
 
@@ -179,9 +183,6 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
     const oWidth = 2 * (torusRadius + torusTube); // approx visual width of torus "O"
     const gap = 0.12; // spacing between letters and torus
 
-    // Align vertically with torus center
-    const centerY = torus.position.y;
-
     // Center the entire word (T + O + RUS) at x=0 by shifting torus.x and placing letters around it
     const totalWidth = widthT + oWidth + widthRUS + gap * 2;
     const torusX = -totalWidth * 0.5 + widthT + oWidth * 0.5;
@@ -189,6 +190,11 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
     const leftEdgeOfO = torusX - oWidth * 0.5;
     const rightEdgeOfO = torusX + oWidth * 0.5;
+
+    // Lift the whole word and camera by approximately the text height to move horizon
+    const textHeight = Math.max(heightT, heightRUS);
+    torus.position.y += textHeight;
+    const centerY = torus.position.y;
 
     meshT.position.set((leftEdgeOfO - gap) - widthT * 0.5, centerY, 0);
     meshRUS.position.set((rightEdgeOfO + gap) + widthRUS * 0.5, centerY, 0);
