@@ -44,8 +44,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
     grad.addColorStop(0.0, inner);
     grad.addColorStop(0.12, inner);
-    grad.addColorStop(0.4, outer);
-    grad.addColorStop(1.0, '#bfcad8');
+    grad.addColorStop(0.3, outer);
+    // grad.addColorStop(1.0, '#bfcad8');
+    grad.addColorStop(1.0, '#040f1c');
 
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
@@ -84,7 +85,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
   const torusMaterial = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     roughness: 0.02,
-    metalness: 0.0,
+    metalness: 0.5,
     transmission: 1.0,
     thickness: 1.0,
     ior: 1.5,
@@ -172,7 +173,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
   const composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
   const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.0, 0.8, 0.85);
-  bloomPass.threshold = 0.1;
+  bloomPass.threshold = 0.02;
   bloomPass.strength = 1.2; // overall bloom intensity
   bloomPass.radius = 0.7; // bloom radius
   composer.addPass(renderPass);
@@ -194,8 +195,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
     const t = clock.getElapsedTime();
 
-    // Rotate torus around Y
-    torus.rotation.y += 0.005;
+    // Rotate torus around Y, add bounce effect
+    torus.rotation.y += 0.007;
+    torus.position.y = 1 + Math.sin(t * 2) * 0.2;
 
     // Subtle light wobble around its base position
     spot.position.x = 5 + Math.cos(t * 0.5) * 1.5;
@@ -209,7 +211,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     causticsTexture.needsUpdate = true;
 
     // Pulse emissive for glow
-    torusMaterial.emissiveIntensity = (Math.sin(t * 2.0) * 0.5 + 0.5) * 0.25; // 0..2
+    torusMaterial.emissiveIntensity = (Math.sin(t * 1.2) * 0.5 + 0.5) * 0.15; // 0..2
 
     // Update controls damping
     controls.update();
