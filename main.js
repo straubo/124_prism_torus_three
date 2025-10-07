@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
@@ -98,17 +100,18 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
     emissiveIntensity: 0.0
   });
   const torus = new THREE.Mesh(
-    new THREE.TorusGeometry(1.0, 0.35, 64, 128),
+    new THREE.TorusGeometry(0.19, 0.07, 64, 128),
     torusMaterial
   );
   torus.position.set(0, 1, 0);
   torus.castShadow = true;
   scene.add(torus);
 
-  // Extruded text "TORUS" using Michroma font
+  // Extruded text "T" and "RUS" using Michroma font (torus acts as the "O")
+  let textMaterial = null;
   const fontLoader = new FontLoader();
   fontLoader.load('./public/Michroma_Regular.json', (font) => {
-    const textGeometry = new TextGeometry('TORUS', {
+    const textOptions = {
       font,
       size: 0.42,
       height: 0.12,
@@ -118,25 +121,62 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
       bevelSize: 0.01,
       bevelOffset: 0,
       bevelSegments: 3
-    });
-    textGeometry.computeBoundingBox();
-    if (textGeometry.boundingBox) {
-      const xExtent = textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x;
-      const yExtent = textGeometry.boundingBox.max.y - textGeometry.boundingBox.min.y;
-      textGeometry.translate(-xExtent * 0.5, -yExtent * 0.5, 0);
-    }
-    const textMaterial = new THREE.MeshStandardMaterial({
+    };
+
+    textMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       metalness: 0.9,
       roughness: 0.2,
       envMapIntensity: 1.0,
-      emissive: new THREE.Color(0x0a0a0a),
-      emissiveIntensity: 0.08
+      // emissive: new THREE.Color(0x0a0a0a),
+      // emissiveIntensity: 0.08
+      emissive: torusMaterial.emissive.clone(),
+      emissiveIntensity: torusMaterial.emissiveIntensity
     });
-    const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-    textMesh.position.set(0, 0.2, 0);
-    textMesh.castShadow = true;
-    scene.add(textMesh);
+
+    // Build geometries for left "T" and right "RUS"
+    const geomT = new TextGeometry('T', textOptions);
+    geomT.computeBoundingBox();
+    if (geomT.boundingBox) {
+      const xExtent = geomT.boundingBox.max.x - geomT.boundingBox.min.x;
+      const yExtent = geomT.boundingBox.max.y - geomT.boundingBox.min.y;
+      geomT.translate(-xExtent * 0.5, -yExtent * 0.5, 0);
+    }
+
+    const geomRUS = new TextGeometry('RUS', textOptions);
+    geomRUS.computeBoundingBox();
+    if (geomRUS.boundingBox) {
+      const xExtent = geomRUS.boundingBox.max.x - geomRUS.boundingBox.min.x;
+      const yExtent = geomRUS.boundingBox.max.y - geomRUS.boundingBox.min.y;
+      geomRUS.translate(-xExtent * 0.5, -yExtent * 0.5, 0);
+    }
+
+    const meshT = new THREE.Mesh(geomT, textMaterial);
+    const meshRUS = new THREE.Mesh(geomRUS, textMaterial);
+    meshT.castShadow = true;
+    meshRUS.castShadow = true;
+
+    // Compute widths for placement around torus (as the "O")
+    const widthT = geomT.boundingBox ? (geomT.boundingBox.max.x - geomT.boundingBox.min.x) : 0;
+    const widthRUS = geomRUS.boundingBox ? (geomRUS.boundingBox.max.x - geomRUS.boundingBox.min.x) : 0;
+
+    const torusRadius = (torus.geometry && torus.geometry.parameters && typeof torus.geometry.parameters.radius === 'number') ? torus.geometry.parameters.radius : 1.0;
+    const torusTube = (torus.geometry && torus.geometry.parameters && typeof torus.geometry.parameters.tube === 'number') ? torus.geometry.parameters.tube : 0.35;
+    const oWidth = 2 * (torusRadius + torusTube); // approx visual width of torus "O"
+    const gap = 0.12; // spacing between letters and torus
+
+    // Align vertically with torus center
+    const centerY = torus.position.y;
+
+    // Place the meshes
+    const leftOfO = -oWidth * 0.3 - gap;
+    meshT.position.set(leftOfO - widthT * 0.5, centerY, 0);
+
+    const rightOfO = oWidth * 0.3 + gap;
+    meshRUS.position.set(rightOfO + widthRUS * 0.5, centerY, 0);
+
+    scene.add(meshT);
+    scene.add(meshRUS);
   });
 
   // Caustics-style spotlight (cookie projection)
@@ -215,12 +255,27 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
   composer.addPass(renderPass);
   composer.addPass(bloomPass);
 
+  // Antialiasing for postprocessing: MSAA if WebGL2, otherwise FXAA shader
+  let fxaaPass = null;
+  const isWebGL2 = renderer.capabilities.isWebGL2 === true;
+  console.log('isWebGL2', isWebGL2);
+  if (isWebGL2) {
+    composer.multisampling = Math.max(8, renderer.capabilities.maxSamples || 4);
+  } else {
+    fxaaPass = new ShaderPass(FXAAShader);
+    fxaaPass.material.uniforms.resolution.value.set(1 / window.innerWidth, 1 / window.innerHeight);
+    composer.addPass(fxaaPass);
+  }
+
   // Resize handling
   function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     composer.setSize(window.innerWidth, window.innerHeight);
+    if (fxaaPass) {
+      fxaaPass.material.uniforms.resolution.value.set(1 / window.innerWidth, 1 / window.innerHeight);
+    }
   }
   window.addEventListener('resize', onWindowResize);
 
@@ -232,8 +287,8 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
     const t = clock.getElapsedTime();
 
     // Rotate torus around Y, add bounce effect
-    torus.rotation.y += 0.007;
-    torus.position.y = 1 + Math.sin(t * 2) * 0.2;
+    // torus.rotation.y += 0.007;
+    // torus.position.y = 1 + Math.sin(t * 2) * 0.2;
 
     // Subtle light wobble around its base position
     spot.position.x = 5 + Math.cos(t * 0.5) * 1.5;
@@ -246,8 +301,10 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
     drawCaustics(caustics.ctx, t * 1.2);
     causticsTexture.needsUpdate = true;
 
-    // Pulse emissive for glow
-    torusMaterial.emissiveIntensity = (Math.sin(t * 1.2) * 0.5 + 0.5) * 0.15; // 0..2
+    // Pulse emissive for glow (shared between torus and text)
+    const glow = (Math.sin(t * 1.2) * 0.5 + 0.5) * 0.15;
+    torusMaterial.emissiveIntensity = glow;
+    if (textMaterial) textMaterial.emissiveIntensity = glow;
 
     // Update controls damping
     controls.update();
