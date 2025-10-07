@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 
 (function () {
   // Scene and camera
@@ -102,6 +104,40 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
   torus.position.set(0, 1, 0);
   torus.castShadow = true;
   scene.add(torus);
+
+  // Extruded text "TORUS" using Michroma font
+  const fontLoader = new FontLoader();
+  fontLoader.load('./public/Michroma_Regular.json', (font) => {
+    const textGeometry = new TextGeometry('TORUS', {
+      font,
+      size: 0.42,
+      height: 0.12,
+      curveSegments: 12,
+      bevelEnabled: true,
+      bevelThickness: 0.02,
+      bevelSize: 0.01,
+      bevelOffset: 0,
+      bevelSegments: 3
+    });
+    textGeometry.computeBoundingBox();
+    if (textGeometry.boundingBox) {
+      const xExtent = textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x;
+      const yExtent = textGeometry.boundingBox.max.y - textGeometry.boundingBox.min.y;
+      textGeometry.translate(-xExtent * 0.5, -yExtent * 0.5, 0);
+    }
+    const textMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 0.9,
+      roughness: 0.2,
+      envMapIntensity: 1.0,
+      emissive: new THREE.Color(0x0a0a0a),
+      emissiveIntensity: 0.08
+    });
+    const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+    textMesh.position.set(0, 0.2, 0);
+    textMesh.castShadow = true;
+    scene.add(textMesh);
+  });
 
   // Caustics-style spotlight (cookie projection)
   function createCausticsCanvas(size) {
